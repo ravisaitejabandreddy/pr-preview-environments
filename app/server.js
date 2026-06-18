@@ -56,6 +56,7 @@ const page = `<!doctype html>
       <span class="badge">sha: <code>${GIT_SHA.slice(0, 7)}</code></span>
     </div>
     <p>Edit anything in this branch, push, and watch this page change color &amp; content automatically.</p>
+    <p>✨ <strong>New in this PR:</strong> a welcome banner, deployed by the self-hosted runner.</p>
   </div>
 </body>
 </html>`;
