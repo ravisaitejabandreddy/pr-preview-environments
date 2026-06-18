@@ -5,12 +5,46 @@ Kubernetes namespace**, and comments a **live URL** on the PR. Close the PR → 
 torn down automatically. This is the pattern behind Vercel/Netlify previews,
 built from scratch on local infrastructure.
 
-```
-PR opened ──► GitHub Action ──► docker build ──► kind load ──► kubectl apply
-                                                                   │
-   reviewer clicks  ◄── comment URL ◄── wait rollout ◄────────────┘
-        │
-   PR closed ──► GitHub Action ──► kubectl delete namespace (teardown)
+```mermaid
+flowchart TD
+    dev(["👩‍💻 Developer"]) -->|push commit / open PR| pr{{"Pull Request"}}
+
+    pr -->|opened · reopened · synchronize| deployWf["⚙️ deploy workflow"]
+    pr -->|closed / merged| teardownWf["🧹 teardown workflow"]
+
+    subgraph CI["GitHub Actions · self-hosted runner"]
+        direction TB
+        deployWf --> build["docker build image"]
+        build --> load["kind load image<br/>(no registry)"]
+        load --> apply["kubectl apply manifests"]
+        teardownWf --> del["kubectl delete namespace"]
+    end
+
+    subgraph K8S["kind cluster (local)"]
+        direction TB
+        apply --> ns[("Namespace<br/>preview-pr-N")]
+        ns --> workload["Deployment + Service"]
+        workload --> ing["Ingress + nip.io host<br/>pr-N.127-0-0-1.nip.io"]
+    end
+
+    ing --> rollout{"rollout<br/>healthy?"}
+    rollout -->|yes| comment["💬 Sticky PR comment<br/>with live URL"]
+    rollout -->|no| fail["❌ workflow fails"]
+
+    comment --> reviewer(["👀 Reviewer opens URL"])
+    reviewer --> app[["🚀 Live preview environment"]]
+
+    del --> cleanup["💬 Comment: environment torn down"]
+
+    classDef trigger fill:#1f6feb,stroke:#0b3d91,color:#fff;
+    classDef ci fill:#2da44e,stroke:#16632f,color:#fff;
+    classDef k8s fill:#8957e5,stroke:#4c2889,color:#fff;
+    classDef output fill:#bf8700,stroke:#7a5600,color:#fff;
+
+    class dev,pr,reviewer trigger;
+    class deployWf,teardownWf,build,load,apply,del ci;
+    class ns,workload,ing k8s;
+    class comment,app,cleanup,fail output;
 ```
 
 ## The stack
