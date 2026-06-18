@@ -1,0 +1,95 @@
+# Templated per-PR environment. Variables are filled by `envsubst` in the
+# deploy script: ${NAMESPACE} ${PR_NUMBER} ${IMAGE} ${HOST} ${GIT_SHA} ${GIT_BRANCH}
+#
+# Everything for one PR lives in its own namespace, so teardown = delete namespace.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${NAMESPACE}
+  labels:
+    app.kubernetes.io/managed-by: pr-preview
+    preview.pr/number: "${PR_NUMBER}"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: preview
+  namespace: ${NAMESPACE}
+  labels:
+    app: preview
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: preview
+  template:
+    metadata:
+      labels:
+        app: preview
+    spec:
+      containers:
+        - name: app
+          image: ${IMAGE}
+          # IfNotPresent so kind-loaded images aren't re-pulled from a registry.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          env:
+            - name: PR_NUMBER
+              value: "${PR_NUMBER}"
+            - name: GIT_SHA
+              value: "${GIT_SHA}"
+            - name: GIT_BRANCH
+              value: "${GIT_BRANCH}"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "128Mi"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: preview
+  namespace: ${NAMESPACE}
+spec:
+  selector:
+    app: preview
+  ports:
+    - port: 80
+      targetPort: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: preview
+  namespace: ${NAMESPACE}
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ${HOST}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: preview
+                port:
+                  number: 80

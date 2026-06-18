@@ -1,0 +1,10 @@
+{
+  "name": "pr-preview-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Zero-dependency demo app for ephemeral PR preview environments",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
